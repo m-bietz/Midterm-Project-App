@@ -1,0 +1,831 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Green Lens – Fort Collins Temperatures</title>
+
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              forest: {
+                50: '#eef7f2',
+                100: '#d5ebdd',
+                200: '#a9d6b9',
+                300: '#79bf93',
+                400: '#4fa573',
+                500: '#348b5a',
+                600: '#276c47',
+                700: '#20563a',
+                800: '#173b28',
+                900: '#11291c',
+              },
+              sky: {
+                50: '#ecf6ff',
+                100: '#d0e7ff',
+                200: '#a1ceff',
+                300: '#74b4ff',
+                400: '#4597f5',
+                500: '#2c78d1',
+                600: '#215ea5',
+                700: '#18457a',
+                800: '#102f52',
+                900: '#091b30',
+              },
+              earth: {
+                50: '#f5f2eb',
+                100: '#e8ddc7',
+                200: '#d1be93',
+                300: '#b69b5e',
+                400: '#9a7c3a',
+                500: '#7f632a',
+                600: '#654e22',
+                700: '#4b3a1a',
+                800: '#312513',
+                900: '#1d150b',
+              },
+            },
+          },
+        },
+      };
+    </script>
+
+    <!-- React 18 + ReactDOM via CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <!-- Babel for JSX in the browser (fine for a small project / prototype) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+
+  <body class="min-h-screen bg-gradient-to-b from-sky-900 via-slate-950 to-forest-950 text-slate-50 antialiased">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState } = React;
+
+      // Daily air temperature readings for the last ~3 months in Fort Collins
+      // Use: dailyTemperatureData.readings as your chart series.
+      const dailyTemperatureData = (() => {
+        const readings = [];
+        const today = new Date("2026-03-08"); // or use: new Date() for "now"
+
+        for (let i = 89; i >= 0; i--) {
+          const d = new Date(today);
+          d.setDate(d.getDate() - i);
+
+          // Rough seasonal baseline: colder in Dec/Jan, milder by March
+          const month = d.getMonth(); // 0=Jan, 1=Feb, ... 11=Dec
+          let base;
+          if (month === 11 || month === 0) {
+            base = 32; // Dec, Jan
+          } else if (month === 1) {
+            base = 38; // Feb
+          } else {
+            base = 45; // early March
+          }
+
+          // Smooth variation + small random noise
+          const seasonalWave = Math.sin((i / 12) * Math.PI) * 10; // gentle swings
+          const randomNoise = (Math.random() - 0.5) * 8; // ±4°F
+
+          let value = Math.round(
+            Math.min(75, Math.max(0, base + seasonalWave + randomNoise))
+          );
+
+          readings.push({
+            date: d.toISOString().slice(0, 10), // "YYYY-MM-DD"
+            value, // °F
+            historicalAvg: base, // same-day historical average for comparison
+          });
+        }
+
+        return {
+          location: "Fort Collins, CO",
+          unit: "F",
+          startDate: readings[0].date,
+          endDate: readings[readings.length - 1].date,
+          readings,
+        };
+      })();
+
+      // Quick way to inspect the data in DevTools
+      console.log(dailyTemperatureData);
+
+      function PlaceholderLogo() {
+        return (
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-forest-500/90 shadow-lg shadow-emerald-900/40 ring-2 ring-emerald-300/70">
+            <span className="text-lg font-semibold tracking-tight text-emerald-50">
+              GL
+            </span>
+          </div>
+        );
+      }
+
+      function Header() {
+        return (
+          <header className="flex items-center justify-between gap-4 border-b border-slate-800/80 bg-slate-950/60 px-6 py-4 backdrop-blur">
+            <div className="flex items-center gap-3">
+              <PlaceholderLogo />
+              <div>
+                <h1 className="text-xl font-semibold tracking-tight text-emerald-100 sm:text-2xl">
+                  The Green Lens
+                </h1>
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                  Fort Collins Daily Temperature Monitor
+                </p>
+              </div>
+            </div>
+
+            <div className="hidden items-center gap-3 text-right sm:flex">
+              <div className="text-right">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  Focus
+                </p>
+                <p className="text-sm text-slate-100">
+                  Daily vs. Historical Averages
+                </p>
+              </div>
+            </div>
+          </header>
+        );
+      }
+
+      function Hero() {
+        return (
+          <section className="border-b border-slate-800/80 bg-gradient-to-br from-slate-950/90 via-slate-950/60 to-forest-950/60 px-6 py-8 sm:py-10">
+            <div className="mx-auto flex max-w-5xl flex-col gap-6 md:flex-row md:items-center">
+              <div className="flex-1">
+                <p className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-emerald-200">
+                  Daily Temperature in Fort Collins
+                </p>
+                <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-50 sm:text-3xl lg:text-4xl">
+                  Seeing climate change through{" "}
+                  <span className="bg-gradient-to-r from-emerald-300 via-sky-300 to-amber-300 bg-clip-text text-transparent">
+                    everyday temperatures
+                  </span>
+                  .
+                </h2>
+                <p className="mt-4 max-w-xl text-sm leading-relaxed text-slate-300 sm:text-base">
+                  The Green Lens compares each day&apos;s temperature in Fort Collins
+                  to its long-term historical average. By tracking how often and how
+                  far we deviate from &quot;normal,&quot; we can better understand how
+                  a warming climate is reshaping our local weather patterns.
+                </p>
+                <p className="mt-3 max-w-xl text-xs leading-relaxed text-slate-400 sm:text-sm">
+                  This dashboard will surface subtle trends—warmer nights, earlier
+                  springs, and more frequent heat waves—through clear, data-driven
+                  visuals.
+                </p>
+              </div>
+
+              <div className="mt-6 flex-1 md:mt-0">
+                <div className="relative overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/60 p-4 shadow-xl shadow-emerald-900/40">
+                  <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/20 via-sky-400/10 to-amber-300/10 mix-blend-soft-light" />
+                  <div className="relative space-y-4">
+                    <div className="flex items-baseline justify-between">
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                        Today&apos;s Snapshot
+                      </p>
+                      <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-[0.65rem] font-medium uppercase tracking-[0.2em] text-emerald-200">
+                        Prototype View
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 text-xs sm:text-sm">
+                      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+                        <p className="text-[0.65rem] uppercase tracking-[0.2em] text-emerald-200">
+                          Today
+                        </p>
+                        <p className="mt-1 text-lg font-semibold text-emerald-50">
+                          72°F
+                        </p>
+                        <p className="mt-1 text-[0.7rem] text-emerald-100/80">
+                          Observed high in Fort Collins
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-3">
+                        <p className="text-[0.65rem] uppercase tracking-[0.2em] text-sky-200">
+                          Historical
+                        </p>
+                        <p className="mt-1 text-lg font-semibold text-sky-50">
+                          65°F
+                        </p>
+                        <p className="mt-1 text-[0.7rem] text-sky-100/80">
+                          Long-term daily average
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                        <p className="text-[0.65rem] uppercase tracking-[0.2em] text-amber-100">
+                          Anomaly
+                        </p>
+                        <p className="mt-1 text-lg font-semibold text-amber-50">
+                          +7°F
+                        </p>
+                        <p className="mt-1 text-[0.7rem] text-amber-100/80">
+                          Above historical norm
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="text-[0.7rem] leading-relaxed text-slate-300">
+                      Future charts on this dashboard will replace these placeholders
+                      to show daily anomalies, seasonal trends, and distribution
+                      shifts over time.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+      }
+
+      const THRESHOLD_MIN = -15;
+      const THRESHOLD_MAX = 15;
+
+      function TemperatureLineChart({ data }) {
+        const [threshold, setThreshold] = useState(0);
+
+        if (!Array.isArray(data) || data.length === 0) {
+          return (
+            <div className="mt-6 flex h-64 items-center justify-center rounded-2xl border border-slate-800/80 bg-slate-950/60 text-xs text-slate-400">
+              No data available.
+            </div>
+          );
+        }
+
+        // Map data points into a normalized SVG coordinate system
+        const minY = 0;
+        const maxY = 80; // a bit above our 0–75°F range for padding
+        const rangeY = maxY - minY || 1;
+
+        const chartLeft = 10;
+        const chartRight = 110; // 25% wider than 80 units (80 * 1.25 = 100)
+        const chartTop = 10;
+        const chartBottom = 82; // leave room below for x-axis labels and title
+        const chartHeight = chartBottom - chartTop;
+        const chartWidth = chartRight - chartLeft;
+
+        const mapTempToY = (temp) => {
+          const normalized = (temp - minY) / rangeY;
+          // 0°F → bottom, 80°F → near top
+          return chartBottom - normalized * chartHeight;
+        };
+
+        const points = data.map((d, index) => {
+          const t = data.length > 1 ? index / (data.length - 1) : 0;
+          const x = chartLeft + t * chartWidth;
+          const y = mapTempToY(d.value);
+          const historicalAvg = d.historicalAvg != null ? d.historicalAvg : d.value;
+          const anomaly = d.value - historicalAvg;
+          const isHighlighted =
+            threshold < 0 ? anomaly <= threshold : threshold > 0 ? anomaly >= threshold : false;
+          return { x, y, date: d.date, value: d.value, anomaly, isHighlighted };
+        });
+
+        // Major x-axis ticks every 10 days (plus last point)
+        const xTicks = points.filter(
+          (_pt, index) => index % 10 === 0 || index === points.length - 1
+        );
+
+        const formatDateLabel = (isoDate) => {
+          const d = new Date(isoDate);
+          const dd = String(d.getDate()).padStart(2, '0');
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const yyyy = d.getFullYear();
+          return `${mm}-${dd}-${yyyy}`;
+        };
+
+        const buildSmoothPath = (pts) => {
+          if (pts.length < 2) return '';
+          const path = [`M ${pts[0].x} ${pts[0].y}`];
+          for (let i = 0; i < pts.length - 1; i++) {
+            const p0 = i === 0 ? pts[0] : pts[i - 1];
+            const p1 = pts[i];
+            const p2 = pts[i + 1];
+            const p3 = i + 2 < pts.length ? pts[i + 2] : p2;
+
+            const cp1x = p1.x + (p2.x - p0.x) / 6;
+            const cp1y = p1.y + (p2.y - p0.y) / 6;
+            const cp2x = p2.x - (p3.x - p1.x) / 6;
+            const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+            path.push(`C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${p2.x} ${p2.y}`);
+          }
+          return path.join(' ');
+        };
+
+        const linePath = buildSmoothPath(points);
+
+        return (
+          <div className="mt-6 rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4 shadow-md shadow-black/40">
+            <div className="flex items-baseline justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-50">
+                  Daily Temperature in Fort Collins (Last 90 Days)
+                </h4>
+                <p className="mt-1 text-xs text-slate-400">
+                  Each point shows the observed daily temperature over the past three months.
+                </p>
+              </div>
+              <p className="hidden text-[0.7rem] text-slate-500 sm:block">
+                Data source: simulated readings for dashboard design.
+              </p>
+            </div>
+
+            {/* Threshold Limit slider: negative = below historical avg, positive = above */}
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <label htmlFor="threshold-slider" className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                Threshold Limit
+              </label>
+              <div className="flex flex-1 items-center gap-3">
+                <span className="w-8 text-right text-xs text-slate-400 tabular-nums">
+                  {THRESHOLD_MIN}°F
+                </span>
+                <input
+                  id="threshold-slider"
+                  type="range"
+                  min={THRESHOLD_MIN}
+                  max={THRESHOLD_MAX}
+                  value={threshold}
+                  onChange={(e) => setThreshold(Number(e.target.value))}
+                  className="h-2 w-full max-w-md flex-1 appearance-none rounded-lg bg-slate-800 accent-emerald-500"
+                />
+                <span className="w-8 text-right text-xs text-slate-400 tabular-nums">
+                  {THRESHOLD_MAX}°F
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-200">
+                <span className="tabular-nums">
+                  {threshold === 0
+                    ? '0°F (at historical average)'
+                    : threshold < 0
+                    ? `${threshold}°F (below average)`
+                    : `+${threshold}°F (above average)`}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-4 w-full">
+              <div
+                className="mx-auto w-4/5 min-h-[16rem]"
+                style={{ aspectRatio: '124/110' }}
+              >
+                <svg
+                  viewBox="-14 0 124 110"
+                  className="h-full w-full block"
+                  preserveAspectRatio="xMidYMid meet"
+                >
+                <defs>
+                  <linearGradient id="tempLine" x1="0" x2="1" y1="0" y2="0">
+                    <stop offset="0%" stopColor="#4ade80" />
+                    <stop offset="100%" stopColor="#22c55e" />
+                  </linearGradient>
+                </defs>
+
+                {/* Background horizontal grid for temperature bands */}
+                <g stroke="#1f2937" strokeWidth="0.3">
+                  {[0, 25, 50, 75].map((temp) => {
+                    const y = mapTempToY(temp);
+                    return <line key={temp} x1={chartLeft} x2={chartRight} y1={y} y2={y} />;
+                  })}
+                </g>
+
+                {/* Major x-axis ticks every 10 days */}
+                <g stroke="#1f2937" strokeWidth="0.3">
+                  {xTicks.map((pt) => (
+                    <line
+                      key={pt.date}
+                      x1={pt.x}
+                      x2={pt.x}
+                      y1={chartTop}
+                      y2={chartBottom}
+                    />
+                  ))}
+                </g>
+
+                {/* Y-axis tick labels (temperatures in °F) */}
+                {[0, 25, 50, 75].map((temp) => {
+                  const y = mapTempToY(temp);
+                  return (
+                    <text
+                      key={temp}
+                      x="10"
+                      y={y + 1.8}
+                      fill="#9CA3AF"
+                      fontSize="3"
+                      textAnchor="end"
+                    >
+                      {temp}°F
+                    </text>
+                  );
+                })}
+
+                {/* Y-axis title: far left with clear gap from temperature labels */}
+                <text
+                  x="-8"
+                  y="50"
+                  fill="#9CA3AF"
+                  fontSize="3.5"
+                  textAnchor="middle"
+                  transform="rotate(-90 -8 50)"
+                >
+                  Daily Temperatures in °F
+                </text>
+                <text
+                  x="60"
+                  y="108.5"
+                  fill="#9CA3AF"
+                  fontSize="3.5"
+                  textAnchor="middle"
+                >
+                  Day
+                </text>
+
+                {/* X-axis date labels every 10 days (rotated 90° for readability) */}
+                {xTicks.map((pt) => (
+                  <text
+                    key={`${pt.date}-label`}
+                    x={pt.x}
+                    y={chartBottom + 10}
+                    fill="#9CA3AF"
+                    fontSize="2.6"
+                    textAnchor="end"
+                    transform={`rotate(-90 ${pt.x} ${chartBottom + 10})`}
+                  >
+                    {formatDateLabel(pt.date)}
+                  </text>
+                ))}
+
+                {/* Smooth temperature line (50% thinner) */}
+                <path
+                  d={linePath}
+                  fill="none"
+                  stroke="url(#tempLine)"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+
+                {/* Decorative dots every ~10 days (when not highlighted by threshold) */}
+                {points.map((p, index) =>
+                  (index % 10 === 0 || index === points.length - 1) && !p.isHighlighted ? (
+                    <circle
+                      key={p.date}
+                      cx={p.x}
+                      cy={p.y}
+                      r="0.8"
+                      fill="#bbf7d0"
+                      stroke="#22c55e"
+                      strokeWidth="0.4"
+                    />
+                  ) : null
+                )}
+                {/* Highlight points that meet threshold: below avg (blue) or above avg (amber) */}
+                {points.map((p) =>
+                  p.isHighlighted ? (
+                    <circle
+                      key={`highlight-${p.date}`}
+                      cx={p.x}
+                      cy={p.y}
+                      r="1.8"
+                      fill={threshold < 0 ? '#38bdf8' : '#fbbf24'}
+                      stroke={threshold < 0 ? '#0ea5e9' : '#f59e0b'}
+                      strokeWidth="0.5"
+                    />
+                  ) : null
+                )}
+              </svg>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function TemperatureVarianceCalculator({ readings }) {
+        const [chosenDate, setChosenDate] = useState(
+          readings?.length ? readings[readings.length - 1].date : ''
+        );
+        const [dailyHigh, setDailyHigh] = useState('');
+
+        const lookup = readings?.find((r) => r.date === chosenDate);
+        const historicalAvg = lookup?.historicalAvg ?? lookup?.value ?? null;
+        const dailyHighNum = dailyHigh === '' ? null : Number(dailyHigh);
+        const variance =
+          historicalAvg != null && dailyHighNum != null && !Number.isNaN(dailyHighNum)
+            ? dailyHighNum - historicalAvg
+            : null;
+
+        return (
+          <section className="rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4 shadow-md shadow-black/40">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
+              Temperature Variance Calculator
+            </h3>
+            <div className="mt-4 flex flex-col gap-4">
+              <div>
+                <label htmlFor="variance-date" className="mb-1 block text-xs font-medium text-slate-400">
+                  Date
+                </label>
+                <input
+                  id="variance-date"
+                  type="date"
+                  value={chosenDate}
+                  onChange={(e) => setChosenDate(e.target.value)}
+                  min={readings?.[0]?.date}
+                  max={readings?.[readings.length - 1]?.date}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                />
+              </div>
+              <div>
+                <label htmlFor="variance-temp" className="mb-1 block text-xs font-medium text-slate-400">
+                  Daily High Temperature
+                </label>
+                <input
+                  id="variance-temp"
+                  type="number"
+                  placeholder="°F"
+                  value={dailyHigh}
+                  onChange={(e) => setDailyHigh(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:border-emerald-500/50 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                />
+              </div>
+              <div className="rounded-xl border border-slate-700/80 bg-slate-900/60 px-3 py-3">
+                <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                  Temperature Variance in °F from Historical Average for Chosen Date
+                </p>
+                <p className="mt-2 text-xl font-semibold tabular-nums text-slate-100">
+                  {variance != null
+                    ? `${variance >= 0 ? '+' : ''}${variance}°F`
+                    : '—'}
+                </p>
+              </div>
+            </div>
+          </section>
+        );
+      }
+
+      function CardDailyVsHistorical({ data }) {
+        if (!data?.length) return <div className="h-28 flex items-center justify-center text-slate-500 text-xs">No data</div>;
+        const w = 100; const h = 28; const pad = 4;
+        const xs = data.map((_, i) => pad + (i / (data.length - 1 || 1)) * (w - 2 * pad));
+        const vals = data.map((d) => d.value); const avgs = data.map((d) => d.historicalAvg ?? d.value);
+        const min = Math.min(...vals, ...avgs); const max = Math.max(...vals, ...avgs); const range = max - min || 1;
+        const toY = (v) => h - pad - ((v - min) / range) * (h - 2 * pad);
+        const line = (arr) => arr.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xs[i]} ${toY(v)}`).join(' ');
+        return (
+          <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-28 rounded-lg" preserveAspectRatio="none">
+            <path d={line(vals)} fill="none" stroke="#4ade80" strokeWidth="0.8" />
+            <path d={line(avgs)} fill="none" stroke="#94a3b8" strokeWidth="0.6" strokeDasharray="2 2" />
+          </svg>
+        );
+      }
+
+      function CardAnomalyHistogram({ data }) {
+        if (!data?.length) return <div className="h-28 flex items-center justify-center text-slate-500 text-xs">No data</div>;
+        const anomalies = data.map((d) => (d.value - (d.historicalAvg ?? d.value)));
+        const buckets = [-15, -10, -5, 0, 5, 10, 15];
+        const counts = buckets.slice(0, -1).map((lo, i) => {
+          const hi = buckets[i + 1];
+          return anomalies.filter((a) => a >= lo && a < hi).length;
+        });
+        const maxCount = Math.max(...counts, 1);
+        const w = 100; const h = 28; const barW = (w - 2 * 4) / counts.length - 2;
+        return (
+          <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-28 rounded-lg" preserveAspectRatio="none">
+            {counts.map((c, i) => {
+              const x = 4 + i * (w - 8) / counts.length + 1;
+              const barH = (c / maxCount) * (h - 8);
+              const y = h - 4 - barH;
+              const cold = buckets[i] < 0;
+              return <rect key={i} x={x} y={y} width={barW} height={barH} fill={cold ? '#38bdf8' : '#fbbf24'} opacity={0.9} rx={1} />;
+            })}
+          </svg>
+        );
+      }
+
+      function CardSeasonalPatterns({ data }) {
+        if (!data?.length) return <div className="h-28 flex items-center justify-center text-slate-500 text-xs">No data</div>;
+        const byMonth = {};
+        data.forEach((d) => {
+          const month = new Date(d.date).getMonth();
+          const anomaly = d.value - (d.historicalAvg ?? d.value);
+          if (!byMonth[month]) byMonth[month] = [];
+          byMonth[month].push(anomaly);
+        });
+        const months = [11, 0, 1, 2];
+        const labels = ['Dec', 'Jan', 'Feb', 'Mar'];
+        const avgs = months.map((m) => {
+          const arr = byMonth[m] || [];
+          return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+        });
+        const w = 100; const h = 28; const pad = 4;
+        const maxA = Math.max(...avgs.map(Math.abs), 1);
+        const toY = (v) => h / 2 - (v / maxA) * (h / 2 - pad);
+        return (
+          <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-28 rounded-lg" preserveAspectRatio="none">
+            <line x1={pad} x2={w - pad} y1={h / 2} y2={h / 2} stroke="#475569" strokeWidth="0.4" />
+            {avgs.map((v, i) => {
+              const x = pad + (i + 0.5) * (w - 2 * pad) / avgs.length;
+              const y = toY(v);
+              return <circle key={i} cx={x} cy={y} r="2.5" fill={v >= 0 ? '#fbbf24' : '#38bdf8'} />;
+            })}
+            {labels.map((l, i) => (
+              <text key={i} x={pad + (i + 0.5) * (w - 2 * pad) / labels.length} y={h - 2} fontSize="3" fill="#94a3b8" textAnchor="middle">{l}</text>
+            ))}
+          </svg>
+        );
+      }
+
+      function CardExtremesHeatwaves({ data }) {
+        if (!data?.length) return <div className="h-28 flex items-center justify-center text-slate-500 text-xs">No data</div>;
+        const withAnomaly = data.map((d) => ({ ...d, anomaly: d.value - (d.historicalAvg ?? d.value) }));
+        const top = [...withAnomaly].sort((a, b) => b.anomaly - a.anomaly).slice(0, 8);
+        const maxAnom = Math.max(...top.map((d) => d.anomaly), 1);
+        const w = 100; const h = 28; const pad = 4;
+        return (
+          <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-28 rounded-lg" preserveAspectRatio="none">
+            {top.map((d, i) => {
+              const x = pad + (i + 0.5) * (w - 2 * pad) / top.length;
+              const barH = (d.anomaly / maxAnom) * (h - 10);
+              return <rect key={d.date} x={x - (w - 2 * pad) / top.length / 4} y={h - 4 - barH} width={(w - 2 * pad) / top.length / 2} height={barH} fill="#f59e0b" opacity={0.9} rx={1} />;
+            })}
+          </svg>
+        );
+      }
+
+      function CardLongTermTrend({ data }) {
+        if (!data?.length) return <div className="h-28 flex items-center justify-center text-slate-500 text-xs">No data</div>;
+        const win = 7;
+        const smoothed = data.map((_, i) => {
+          const start = Math.max(0, i - win + 1);
+          const slice = data.slice(start, i + 1).map((d) => d.value);
+          return slice.reduce((a, b) => a + b, 0) / slice.length;
+        });
+        const w = 100; const h = 28; const pad = 4;
+        const min = Math.min(...smoothed); const max = Math.max(...smoothed); const range = max - min || 1;
+        const toY = (v) => h - pad - ((v - min) / range) * (h - 2 * pad);
+        const xs = smoothed.map((_, i) => pad + (i / (smoothed.length - 1 || 1)) * (w - 2 * pad));
+        const path = smoothed.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xs[i]} ${toY(v)}`).join(' ');
+        return (
+          <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-28 rounded-lg" preserveAspectRatio="none">
+            <path d={path} fill="none" stroke="#34d399" strokeWidth="1.2" />
+          </svg>
+        );
+      }
+
+      function CardContextMethodology() {
+        return (
+          <div className="h-28 rounded-lg bg-slate-900/60 p-3 text-xs text-slate-300 space-y-1.5 overflow-y-auto">
+            <p><strong className="text-slate-200">Baseline:</strong> Historical average is a same-day seasonal baseline (Dec/Jan 32°F, Feb 38°F, Mar 45°F).</p>
+            <p><strong className="text-slate-200">Source:</strong> Simulated daily high temperatures for Fort Collins, CO (90 days).</p>
+            <p><strong className="text-slate-200">Processing:</strong> Anomaly = observed − historical; trend uses 7-day rolling mean.</p>
+          </div>
+        );
+      }
+
+      const DASHBOARD_CARDS = [
+        { title: 'Daily Temperature vs. Historical Average', subtitle: 'Time series comparison', Chart: CardDailyVsHistorical },
+        { title: 'Temperature Anomaly Distribution', subtitle: 'Frequency of warm & cool days', Chart: CardAnomalyHistogram },
+        { title: 'Seasonal Patterns', subtitle: 'Shifts across the year', Chart: CardSeasonalPatterns },
+        { title: 'Extremes & Heatwaves', subtitle: 'Outlier events', Chart: CardExtremesHeatwaves },
+        { title: 'Long-Term Trend', subtitle: 'Smoothed trend', Chart: CardLongTermTrend },
+        { title: 'Context & Methodology', subtitle: 'How we compute "normal"', Chart: CardContextMethodology },
+      ];
+
+      function GridPlaceholder({ data }) {
+        const cards = [
+          {
+            title: 'Daily Temperature vs. Historical Average',
+            subtitle: 'Time series comparison',
+            description:
+              'Line chart placeholder where each day is plotted against its long-term mean.',
+          },
+          {
+            title: 'Temperature Anomaly Distribution',
+            subtitle: 'Frequency of warm & cool days',
+            description:
+              'Histogram or density plot showing how often days deviate by certain degrees.',
+          },
+          {
+            title: 'Seasonal Patterns',
+            subtitle: 'Shifts across the year',
+            description:
+              'Seasonal breakdown of anomalies to reveal earlier springs or extended summers.',
+          },
+          {
+            title: 'Extremes & Heatwaves',
+            subtitle: 'Outlier events',
+            description:
+              'Focus on the most extreme warm days and multi-day heat events.',
+          },
+          {
+            title: 'Long-Term Trend',
+            subtitle: 'Decadal signal',
+            description:
+              'Smoothed trend line to highlight gradual warming over many years.',
+          },
+          {
+            title: 'Context & Methodology',
+            subtitle: 'How we compute “normal”',
+            description:
+              'Space for notes about historical baselines, data sources, and processing choices.',
+          },
+        ];
+
+        return (
+          <main className="px-6 py-8 sm:py-10">
+            <div className="mx-auto max-w-6xl">
+              <div className="flex items-baseline justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
+                    Dashboard Layout
+                  </h3>
+                  <p className="mt-1 text-base text-slate-100">
+                    Chart-ready sections for visualizing daily and long-term patterns.
+                  </p>
+                </div>
+                <div className="hidden text-right text-xs text-slate-400 sm:block">
+                  <p>Charts use the same 90-day temperature and historical-average data.</p>
+                  <p className="mt-1 text-[0.7rem] text-slate-500">
+                    Loaded {Array.isArray(data) ? data.length : 0} days of temperature readings.
+                  </p>
+                </div>
+              </div>
+
+              <TemperatureLineChart data={data} />
+
+              <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {DASHBOARD_CARDS.map((card) => {
+                  const Chart = card.Chart;
+                  return (
+                    <section
+                      key={card.title}
+                      className="group flex flex-col rounded-2xl border border-slate-800/80 bg-slate-950/60 p-4 shadow-md shadow-black/40 transition hover:border-emerald-400/50 hover:bg-slate-900/70"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-sm font-semibold text-slate-50">
+                            {card.title}
+                          </h4>
+                          <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-emerald-300/80">
+                            {card.subtitle}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex-1 min-h-[7rem] rounded-xl border border-slate-700/80 bg-slate-900/60 p-3">
+                        {Chart === CardContextMethodology ? <Chart /> : <Chart data={data} />}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            </div>
+          </main>
+        );
+      }
+
+      function Footer() {
+        return (
+          <footer className="border-t border-slate-800/80 bg-slate-950/80 px-6 py-4 text-xs text-slate-400">
+            <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-2 sm:flex-row">
+              <p className="tracking-tight">
+                Madisyn Bietz | Spring 2026
+              </p>
+              <p className="text-[0.7rem] text-slate-500">
+                Designed with a minimalist, nature-inspired palette to highlight local climate change.
+              </p>
+            </div>
+          </footer>
+        );
+      }
+
+      function App() {
+        const readings = dailyTemperatureData.readings;
+        return (
+          <div className="flex min-h-screen flex-col bg-gradient-to-b from-sky-950 via-slate-950 to-forest-950">
+            <Header />
+            <Hero />
+            <div className="flex flex-1 flex-col px-6 py-6 lg:flex-row lg:gap-8 lg:px-8">
+              <aside className="mb-6 w-full shrink-0 lg:mb-0 lg:w-72">
+                <TemperatureVarianceCalculator readings={readings} />
+              </aside>
+              <div className="min-w-0 flex-1">
+                <GridPlaceholder data={readings} />
+              </div>
+            </div>
+            <Footer />
+          </div>
+        );
+      }
+
+      const rootElement = document.getElementById('root');
+      const root = ReactDOM.createRoot(rootElement);
+      root.render(<App />);
+    </script>
+  </body>
+ </html>
